@@ -1,4 +1,4 @@
-# Financa Bros
+# Finance Bros
 
 Investment scenario tools for comparing recurring contributions, growth, dividends, fees, taxes, and inflation.
 
