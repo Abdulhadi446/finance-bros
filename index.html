@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compound Ledger — Investment Scenario Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --paper:#E9E6DC;
+    --paper-2:#E1DDCF;
+    --ink:#20241D;
+    --ink-soft:#565A4E;
+    --line:#C7C0AC;
+    --green:#2F5233;
+    --green-soft:#3F6B46;
+    --gold:#A9761B;
+    --brick:#8C3323;
+    --panel:#F2F0E7;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#1B1D18;
+      --paper-2:#23261F;
+      --ink:#EDEAE0;
+      --ink-soft:#B7B39F;
+      --line:#3B3E33;
+      --green:#7FA987;
+      --green-soft:#9BC1A0;
+      --gold:#D8A945;
+      --brick:#D98A72;
+      --panel:#212319;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#1B1D18;
+    --paper-2:#23261F;
+    --ink:#EDEAE0;
+    --ink-soft:#B7B39F;
+    --line:#3B3E33;
+    --green:#7FA987;
+    --green-soft:#9BC1A0;
+    --gold:#D8A945;
+    --brick:#D98A72;
+    --panel:#212319;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Source Serif 4', Georgia, 'Times New Roman', serif;
+    line-height:1.45;
+    min-height:100vh;
+  }
+  .num, input, select, .mono{
+    font-family:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  a{color:var(--green-soft);}
+
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 20px 80px;
+  }
+
+  header.masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:8px 24px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:14px;
+    margin-bottom:22px;
+  }
+  header.masthead h1{
+    font-size:clamp(28px,4vw,38px);
+    font-weight:700;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  header.masthead .tagline{
+    color:var(--ink-soft);
+    font-size:14px;
+    max-width:360px;
+    text-align:right;
+  }
+
+  .layout{
+    display:grid;
+    grid-template-columns: 300px 1fr;
+    gap:0 32px;
+    align-items:start;
+  }
+  @media (max-width: 860px){
+    .layout{grid-template-columns: 1fr;}
+  }
+
+  /* ---------- Input ledger (left) ---------- */
+  .controls{
+    border:1px solid var(--line);
+    background:var(--panel);
+    padding:18px 18px 22px;
+    position:sticky;
+    top:16px;
+  }
+  @media (max-width:860px){ .controls{position:static;} }
+
+  .presets{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:18px;
+  }
+  .preset-btn{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    padding:5px 8px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:border-color .15s, color .15s;
+  }
+  .preset-btn:hover{ border-color:var(--green); color:var(--green); }
+  .preset-btn:focus-visible{ outline:2px solid var(--green); outline-offset:1px; }
+
+  fieldset{
+    border:none;
+    border-top:1px solid var(--line);
+    margin:0 0 4px;
+    padding:14px 0 6px;
+  }
+  fieldset:first-of-type{border-top:none; padding-top:0;}
+  legend{
+    font-size:12px;
+    color:var(--ink-soft);
+    padding:0;
+    margin-bottom:8px;
+  }
+
+  .field{
+    margin-bottom:12px;
+  }
+  .field label{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-size:13px;
+    margin-bottom:4px;
+    gap:8px;
+  }
+  .field label .val{
+    color:var(--green);
+    font-weight:600;
+    font-size:13px;
+    white-space:nowrap;
+  }
+  .field .hint{
+    font-size:10.5px;
+    color:var(--ink-soft);
+    margin-top:3px;
+  }
+
+  input[type="range"]{
+    width:100%;
+    accent-color:var(--green);
+    height:18px;
+  }
+  input[type="number"]{
+    width:100%;
+    background:var(--paper);
+    border:1px solid var(--line);
+    color:var(--ink);
+    padding:6px 7px;
+    font-size:13px;
+  }
+  input[type="number"]:focus, input[type="range"]:focus-visible, select:focus-visible{
+    outline:2px solid var(--green);
+    outline-offset:1px;
+  }
+  select{
+    width:100%;
+    background:var(--paper);
+    border:1px solid var(--line);
+    color:var(--ink);
+    padding:6px 7px;
+    font-size:13px;
+  }
+
+  .toggle-row{
+    display:flex;
+    border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .toggle-row button{
+    flex:1;
+    background:transparent;
+    border:none;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    padding:7px 4px;
+    cursor:pointer;
+    border-right:1px solid var(--line);
+  }
+  .toggle-row button:last-child{border-right:none;}
+  .toggle-row button.active{
+    background:var(--green);
+    color:var(--panel);
+  }
+
+  /* ---------- Results (right) ---------- */
+  .results{min-width:0;}
+
+  .hero{
+    border:1px solid var(--ink);
+    padding:22px 24px;
+    margin-bottom:22px;
+    background:var(--panel);
+  }
+  .hero-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .hero-label{
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .hero-number{
+    font-size:clamp(36px,6vw,58px);
+    font-weight:700;
+    color:var(--green);
+    line-height:1;
+    margin:6px 0 4px;
+  }
+  .hero-sub{
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .hero-sub .real-val{color:var(--gold); font-weight:600;}
+
+  .scenario-select{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .scenario-select button{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    padding:5px 9px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .scenario-select button.active{
+    border-color:var(--green);
+    color:var(--green);
+    font-weight:600;
+  }
+
+  table.ledger{
+    width:100%;
+    border-collapse:collapse;
+    margin-bottom:26px;
+    font-size:13px;
+  }
+  table.ledger caption{
+    text-align:left;
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+    caption-side:top;
+  }
+  table.ledger th{
+    text-align:right;
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size:11px;
+    color:var(--ink-soft);
+    border-bottom:1px solid var(--ink);
+    padding:6px 8px;
+  }
+  table.ledger th:first-child{text-align:left;}
+  table.ledger td{
+    text-align:right;
+    padding:8px 8px;
+    border-bottom:1px solid var(--line);
+    font-family:'IBM Plex Mono', monospace;
+  }
+  table.ledger td:first-child{
+    text-align:left;
+    font-family:'Source Serif 4', serif;
+  }
+  table.ledger tr.gain-pos td.gain{ color:var(--green); }
+  table.ledger tfoot td{
+    border-bottom:none;
+    border-top:2px solid var(--ink);
+    font-weight:600;
+    padding-top:8px;
+  }
+
+  .chart-wrap{
+    border:1px solid var(--line);
+    background:var(--panel);
+    padding:16px 16px 8px;
+    margin-bottom:22px;
+  }
+  .chart-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .chart-head h2{
+    font-size:15px;
+    margin:0;
+    font-weight:600;
+  }
+  .chart-canvas-box{ height:320px; position:relative; }
+  .chart-unavailable{height:100%; display:grid; place-items:center; color:var(--ink-soft); font:12px 'IBM Plex Mono', monospace; text-align:center;}
+
+  .footnote{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+  }
+  .footnote p{margin:0 0 8px;}
+  .footnote strong{color:var(--ink);}
+
+  .composition{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    margin-bottom:22px;
+  }
+  @media (max-width:640px){ .composition{grid-template-columns:1fr;} }
+  .composition .cell{
+    background:var(--panel);
+    padding:14px 16px;
+  }
+  .composition .cell .k{
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .composition .cell .v{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:20px;
+    font-weight:600;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <h1>Compound Ledger</h1>
+    <div class="tagline">A scenario calculator for recurring investments — with dividends, fees, taxes and inflation modeled monthly, side by side.</div>
+  </header>
+
+  <div class="layout">
+
+    <!-- ============ CONTROLS ============ -->
+    <div class="controls">
+
+      <div class="presets" id="presets"></div>
+
+      <fieldset>
+        <legend>Investment</legend>
+        <div class="field">
+          <label for="start">Starting balance <span class="val" id="startVal"></span></label>
+          <input type="number" id="start" min="0" step="100" value="0">
+        </div>
+        <div class="field">
+          <label for="contrib">Monthly contribution <span class="val" id="contribVal"></span></label>
+          <input type="number" id="contrib" min="0" step="50" value="1000">
+        </div>
+        <div class="field">
+          <label for="step">Annual contribution raise <span class="val" id="stepVal"></span></label>
+          <input type="range" id="step" min="0" max="20" step="0.5" value="0">
+          <div class="hint">Bumps the monthly amount up once per year — e.g. as your income grows.</div>
+        </div>
+        <div class="field">
+          <label for="years">Time horizon <span class="val" id="yearsVal"></span></label>
+          <input type="range" id="years" min="1" max="30" step="1" value="1">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Growth assumptions</legend>
+        <div class="field">
+          <label for="mgrowth">Monthly price growth <span class="val" id="mgrowthVal"></span></label>
+          <input type="range" id="mgrowth" min="-2" max="5" step="0.05" value="1">
+          <div class="hint" id="annualEquiv"></div>
+        </div>
+        <div class="field">
+          <label for="divyield">Annual dividend yield <span class="val" id="divyieldVal"></span></label>
+          <input type="range" id="divyield" min="0" max="12" step="0.1" value="3">
+        </div>
+        <div class="field">
+          <label for="divgrowth">Annual dividend growth <span class="val" id="divgrowthVal"></span></label>
+          <input type="range" id="divgrowth" min="0" max="15" step="0.5" value="0">
+          <div class="hint">How much the payout itself rises each year (dividend growth investing).</div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Costs &amp; taxes</legend>
+        <div class="field">
+          <label for="fee">Annual fund/expense fee <span class="val" id="feeVal"></span></label>
+          <input type="range" id="fee" min="0" max="3" step="0.05" value="0">
+        </div>
+        <div class="field">
+          <label for="divtax">Dividend tax rate <span class="val" id="divtaxVal"></span></label>
+          <input type="range" id="divtax" min="0" max="45" step="1" value="15">
+          <div class="hint">Set to 0% for a tax-advantaged account.</div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Inflation</legend>
+        <div class="field">
+          <label for="inflation">Annual inflation rate <span class="val" id="inflationVal"></span></label>
+          <input type="range" id="inflation" min="0" max="20" step="0.1" value="3">
+        </div>
+        <div class="field">
+          <label>Show figures in</label>
+          <div class="toggle-row" id="realToggle">
+            <button data-mode="nominal" class="active">Nominal $</button>
+            <button data-mode="real">Today's $</button>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="field" style="margin-top:14px;">
+        <label>Currency label</label>
+        <select id="currency">
+          <option value="$">$ USD</option>
+          <option value="PKR ">PKR</option>
+          <option value="€">€ EUR</option>
+          <option value="£">£ GBP</option>
+          <option value="₹">₹ INR</option>
+          <option value="AED ">AED</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- ============ RESULTS ============ -->
+    <div class="results">
+
+      <div class="hero">
+        <div class="hero-top">
+          <div>
+            <div class="hero-label">Ending value at <span id="heroHorizon">month 12</span> — <span id="heroScenarioLabel">dividends reinvested</span></div>
+            <div class="hero-number num" id="heroNumber">$0</div>
+            <div class="hero-sub">In today's purchasing power: <span class="real-val num" id="heroReal">$0</span></div>
+          </div>
+          <div class="scenario-select" id="scenarioSelect">
+            <button data-s="A">No dividend</button>
+            <button data-s="C">Dividend, cash</button>
+            <button data-s="B" class="active">Dividend, reinvested</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="composition" id="composition"></div>
+
+      <table class="ledger">
+        <caption>All three scenarios at your chosen horizon</caption>
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th>Invested</th>
+            <th>Ending value</th>
+            <th>Gain</th>
+            <th>Multiple</th>
+          </tr>
+        </thead>
+        <tbody id="ledgerBody"></tbody>
+      </table>
+
+      <div class="chart-wrap">
+        <div class="chart-head">
+          <h2>Balance over time</h2>
+        </div>
+        <div class="chart-canvas-box"><canvas id="chart"></canvas><div id="chartUnavailable" class="chart-unavailable" hidden>Chart unavailable while the chart library is offline.</div></div>
+      </div>
+
+      <div class="footnote">
+        <p><strong>What's modeled:</strong> monthly contributions (increased once a year if you set a raise), constant monthly price growth, a dividend yield paid monthly and optionally reinvested, dividend tax, an annual fee drag, and inflation to translate the result into today's purchasing power.</p>
+        <p><strong>What isn't:</strong> real markets don't move in a straight line — an average of 1%/month is not the same as gaining exactly 1% every single month. Capital gains tax on selling, transaction costs, and dividend cuts aren't modeled either. This is a planning sketch, not a forecast or investment advice.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+
+  const ids = ["start","contrib","step","years","mgrowth","divyield","divgrowth","fee","divtax","inflation","currency"];
+  const state = {};
+
+  const PRESETS = [
+    {name:"S&P 500 avg", start:0, contrib:1000, step:0, years:20, mgrowth:0.84, divyield:1.8, divgrowth:2, fee:0.05, divtax:15, inflation:3},
+    {name:"Bond fund", start:0, contrib:1000, step:0, years:20, mgrowth:0.25, divyield:3.5, divgrowth:0, fee:0.1, divtax:22, inflation:3},
+    {name:"High-growth stock", start:0, contrib:1000, step:0, years:10, mgrowth:1.6, divyield:0, divgrowth:0, fee:0, divtax:15, inflation:3},
+    {name:"High-yield dividend", start:0, contrib:1000, step:0, years:15, mgrowth:0.35, divyield:7, divgrowth:1, fee:0.1, divtax:15, inflation:3},
+  ];
+
+  let displayMode = "nominal"; // or "real"
+  let heroScenario = "B"; // A, B, C
+
+  // ---------- storage (per-viewer convenience only) ----------
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem("compound-ledger-inputs");
+      if(!raw) return null;
+      return JSON.parse(raw);
+    }catch(e){ return null; }
+  }
+  function saveState(){
+    try{
+      localStorage.setItem("compound-ledger-inputs", JSON.stringify(state));
+    }catch(e){ /* storage unavailable, ignore */ }
+  }
+
+  function fmtMoney(v, currency){
+    const sign = v < 0 ? "-" : "";
+    const abs = Math.abs(v);
+    return sign + currency + abs.toLocaleString(undefined, {maximumFractionDigits:0});
+  }
+
+  function pct(v){ return v.toFixed(2) + "%"; }
+
+  // ---------- engine ----------
+  function computeSeries(p){
+    const months = p.years * 12;
+    const monthlyGrowth = p.mgrowth/100;
+    const annualFee = p.fee/100;
+    const divTax = p.divtax/100;
+    const baseDivYieldMonthly = (p.divyield/100)/12;
+    const divGrowthAnnual = p.divgrowth/100;
+    const contribStep = p.step/100;
+
+    let A = p.start, B = p.start, C = p.start, cashC = 0, invested = p.start;
+    const series = { months:[], A:[], B:[], C:[], Ctotal:[], invested:[] };
+
+    for(let m=1; m<=months; m++){
+      const yearIdx = Math.floor((m-1)/12);
+      const contribution = p.contrib * Math.pow(1+contribStep, yearIdx);
+      const effGrowth = monthlyGrowth - annualFee/12;
+      const divYieldMonthly = baseDivYieldMonthly * Math.pow(1+divGrowthAnnual, yearIdx);
+
+      // Scenario A: no dividend
+      let afterA = A + contribution;
+      let growA = afterA * effGrowth;
+      A = afterA + growA;
+
+      // Scenario B: dividend reinvested
+      let afterB = B + contribution;
+      let growB = afterB * effGrowth;
+      let divB = afterB * divYieldMonthly * (1-divTax);
+      B = afterB + growB + divB;
+
+      // Scenario C: dividend paid as cash
+      let afterC = C + contribution;
+      let growC = afterC * effGrowth;
+      let divC = afterC * divYieldMonthly * (1-divTax);
+      C = afterC + growC;
+      cashC += divC;
+
+      invested += contribution;
+
+      series.months.push(m);
+      series.A.push(A);
+      series.B.push(B);
+      series.C.push(C);
+      series.Ctotal.push(C + cashC);
+      series.invested.push(invested);
+    }
+    series.cashCFinal = cashC;
+    return series;
+  }
+
+  function realFactor(inflationPct, months){
+    return Math.pow(1 + inflationPct/100/12, months);
+  }
+
+  // ---------- chart ----------
+  let chart = null;
+  function ensureChart(){
+    if(chart) return chart;
+    if(typeof Chart === "undefined"){
+      $("chart").hidden = true;
+      $("chartUnavailable").hidden = false;
+      return null;
+    }
+    const ctx = $("chart").getContext("2d");
+    const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    chart = new Chart(ctx, {
+      type: "line",
+      data: { labels: [], datasets: [
+        { label:"No dividend", data:[], borderColor:cssVar('--ink-soft'), backgroundColor:"transparent", borderWidth:2, pointRadius:0, tension:0.15 },
+        { label:"Dividend, cash", data:[], borderColor:cssVar('--gold'), backgroundColor:"transparent", borderWidth:2, pointRadius:0, tension:0.15 },
+        { label:"Dividend, reinvested", data:[], borderColor:cssVar('--green'), backgroundColor:"transparent", borderWidth:2.5, pointRadius:0, tension:0.15 },
+      ]},
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:"index", intersect:false },
+        plugins:{
+          legend:{ labels:{ color:cssVar('--ink'), font:{family:"IBM Plex Mono", size:11} } },
+          tooltip:{
+            callbacks:{
+              label: function(ctx){
+                const c = state.currency || "$";
+                return ctx.dataset.label + ": " + fmtMoney(ctx.parsed.y, c);
+              }
+            }
+          }
+        },
+        scales:{
+          x:{ ticks:{ color:cssVar('--ink-soft'), font:{family:"IBM Plex Mono", size:10}, maxTicksLimit:12 }, grid:{ color:cssVar('--line') } },
+          y:{ ticks:{ color:cssVar('--ink-soft'), font:{family:"IBM Plex Mono", size:10},
+                callback: function(v){ return (state.currency||"$") + Number(v).toLocaleString(undefined,{maximumFractionDigits:0, notation:"compact"}); } },
+              grid:{ color:cssVar('--line') } }
+        }
+      }
+    });
+    return chart;
+  }
+
+  function render(){
+    // read inputs
+    state.start = parseFloat($("start").value) || 0;
+    state.contrib = parseFloat($("contrib").value) || 0;
+    state.step = parseFloat($("step").value) || 0;
+    state.years = parseInt($("years").value) || 1;
+    state.mgrowth = parseFloat($("mgrowth").value) || 0;
+    state.divyield = parseFloat($("divyield").value) || 0;
+    state.divgrowth = parseFloat($("divgrowth").value) || 0;
+    state.fee = parseFloat($("fee").value) || 0;
+    state.divtax = parseFloat($("divtax").value) || 0;
+    state.inflation = parseFloat($("inflation").value) || 0;
+    state.currency = $("currency").value;
+
+    // update label chips
+    $("startVal").textContent = state.currency + state.start.toLocaleString();
+    $("contribVal").textContent = state.currency + state.contrib.toLocaleString();
+    $("stepVal").textContent = pct(state.step) + "/yr";
+    $("yearsVal").textContent = state.years + (state.years===1 ? " year" : " years");
+    $("mgrowthVal").textContent = pct(state.mgrowth) + "/mo";
+    $("divyieldVal").textContent = pct(state.divyield) + "/yr";
+    $("divgrowthVal").textContent = pct(state.divgrowth) + "/yr";
+    $("feeVal").textContent = pct(state.fee) + "/yr";
+    $("divtaxVal").textContent = pct(state.divtax);
+    $("inflationVal").textContent = pct(state.inflation) + "/yr";
+
+    const annualEquiv = (Math.pow(1+state.mgrowth/100,12)-1)*100;
+    $("annualEquiv").textContent = "≈ " + annualEquiv.toFixed(1) + "% annualized, if it held every month";
+
+    const series = computeSeries(state);
+    const months = series.months.length;
+    const rf = displayMode === "real" ? realFactor(state.inflation, months) : 1;
+
+    const finalA = series.A[months-1] / rf;
+    const finalB = series.B[months-1] / rf;
+    const finalCtotal = series.Ctotal[months-1] / rf;
+    const finalCPortfolio = series.C[months-1] / rf;
+    const finalCash = series.cashCFinal / rf;
+    const invested = series.invested[months-1] / rf;
+
+    // hero
+    const heroValues = { A: finalA, B: finalB, C: finalCtotal };
+    const heroLabels = { A:"no dividends", B:"dividends reinvested", C:"dividends paid as cash" };
+    $("heroHorizon").textContent = "month " + months + " (" + state.years + (state.years===1?" yr":" yrs") + ")";
+    $("heroScenarioLabel").textContent = heroLabels[heroScenario];
+    $("heroNumber").textContent = fmtMoney(heroValues[heroScenario], state.currency);
+    const realAtHero = displayMode === "real" ? heroValues[heroScenario] : heroValues[heroScenario] / realFactor(state.inflation, months);
+    $("heroReal").textContent = fmtMoney(realAtHero, state.currency);
+    $("heroReal").parentElement.style.display = displayMode === "real" ? "none" : "block";
+
+    // composition strip (based on hero scenario)
+    const gain = heroValues[heroScenario] - invested;
+    const comp = $("composition");
+    comp.innerHTML = "";
+    const compData = [
+      ["Total invested", fmtMoney(invested, state.currency)],
+      ["Total gain", fmtMoney(gain, state.currency)],
+      ["Return multiple", (heroValues[heroScenario]/Math.max(invested,1)).toFixed(2) + "x"],
+    ];
+    compData.forEach(([k,v])=>{
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.innerHTML = '<div class="k">'+k+'</div><div class="v">'+v+'</div>';
+      comp.appendChild(cell);
+    });
+
+    // ledger table
+    const rows = [
+      ["No-dividend fund", invested, finalA],
+      ["Dividend, paid as cash", invested, finalCtotal],
+      ["Dividend, reinvested", invested, finalB],
+    ];
+    const tbody = $("ledgerBody");
+    tbody.innerHTML = "";
+    rows.forEach(([name, inv, end])=>{
+      const g = end - inv;
+      const tr = document.createElement("tr");
+      if(g>=0) tr.className = "gain-pos";
+      tr.innerHTML = `<td>${name}</td><td>${fmtMoney(inv,state.currency)}</td><td>${fmtMoney(end,state.currency)}</td><td class="gain">${fmtMoney(g,state.currency)}</td><td>${(end/Math.max(inv,1)).toFixed(2)}x</td>`;
+      tbody.appendChild(tr);
+    });
+
+    // chart
+    const c = ensureChart();
+    if(!c) {
+      saveState();
+      return;
+    }
+    const labels = series.months.map(m => m % 12 === 0 ? (m/12)+"y" : "");
+    c.data.labels = series.months;
+    c.data.datasets[0].data = series.A.map((v,i)=> v / (displayMode==="real" ? realFactor(state.inflation, i+1) : 1));
+    c.data.datasets[1].data = series.Ctotal.map((v,i)=> v / (displayMode==="real" ? realFactor(state.inflation, i+1) : 1));
+    c.data.datasets[2].data = series.B.map((v,i)=> v / (displayMode==="real" ? realFactor(state.inflation, i+1) : 1));
+    c.options.scales.x.ticks.callback = function(val, idx){
+      const m = series.months[idx];
+      if(m===undefined) return "";
+      return (m % 12 === 0) ? (m/12)+"y" : "";
+    };
+    c.update();
+
+    saveState();
+  }
+
+  function applyPreset(p){
+    $("start").value = p.start;
+    $("contrib").value = p.contrib;
+    $("step").value = p.step;
+    $("years").value = p.years;
+    $("mgrowth").value = p.mgrowth;
+    $("divyield").value = p.divyield;
+    $("divgrowth").value = p.divgrowth;
+    $("fee").value = p.fee;
+    $("divtax").value = p.divtax;
+    $("inflation").value = p.inflation;
+    render();
+  }
+
+  function buildPresets(){
+    const box = $("presets");
+    PRESETS.forEach(p=>{
+      const b = document.createElement("button");
+      b.className = "preset-btn";
+      b.textContent = p.name;
+      b.addEventListener("click", ()=>applyPreset(p));
+      box.appendChild(b);
+    });
+  }
+
+  function wireInputs(){
+    ["start","contrib","step","years","mgrowth","divyield","divgrowth","fee","divtax","inflation","currency"].forEach(id=>{
+      $(id).addEventListener("input", render);
+      $(id).addEventListener("change", render);
+    });
+
+    $("realToggle").addEventListener("click", (e)=>{
+      const btn = e.target.closest("button");
+      if(!btn) return;
+      displayMode = btn.dataset.mode;
+      [...$("realToggle").children].forEach(b=>b.classList.toggle("active", b===btn));
+      render();
+    });
+
+    $("scenarioSelect").addEventListener("click", (e)=>{
+      const btn = e.target.closest("button");
+      if(!btn) return;
+      heroScenario = btn.dataset.s;
+      [...$("scenarioSelect").children].forEach(b=>b.classList.toggle("active", b===btn));
+      render();
+    });
+  }
+
+  function init(){
+    buildPresets();
+    wireInputs();
+    const saved = loadSaved();
+    if(saved){
+      try{
+        if(saved.start!==undefined) $("start").value = saved.start;
+        if(saved.contrib!==undefined) $("contrib").value = saved.contrib;
+        if(saved.step!==undefined) $("step").value = saved.step;
+        if(saved.years!==undefined) $("years").value = saved.years;
+        if(saved.mgrowth!==undefined) $("mgrowth").value = saved.mgrowth;
+        if(saved.divyield!==undefined) $("divyield").value = saved.divyield;
+        if(saved.divgrowth!==undefined) $("divgrowth").value = saved.divgrowth;
+        if(saved.fee!==undefined) $("fee").value = saved.fee;
+        if(saved.divtax!==undefined) $("divtax").value = saved.divtax;
+        if(saved.inflation!==undefined) $("inflation").value = saved.inflation;
+        if(saved.currency!==undefined) $("currency").value = saved.currency;
+      }catch(e){ /* ignore malformed save */ }
+    } else {
+      // default to first preset for a friendlier first run
+      applyPreset(PRESETS[0]);
+    }
+    render();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
