@@ -415,8 +415,15 @@
           <div class="hint">Bumps the monthly amount up once per year — e.g. as your income grows.</div>
         </div>
         <div class="field">
-          <label for="years">Time horizon <span class="val" id="yearsVal"></span></label>
+          <label for="years"><span id="horizonLabel">Time horizon</span> <span class="val" id="yearsVal"></span></label>
           <input type="range" id="years" min="1" max="30" step="1" value="1">
+        </div>
+        <div class="field">
+          <label>Calculate by</label>
+          <div class="toggle-row" id="periodToggle">
+            <button data-mode="years" class="active">Years</button>
+            <button data-mode="months">Months</button>
+          </div>
         </div>
         <div class="field">
           <label for="stopMonths">Stop contributions after <span class="val" id="stopMonthsVal"></span></label>
@@ -541,7 +548,7 @@
         <div class="panel-head"><h2>Dividend income</h2><span class="panel-note">Dividend, cash scenario after tax</span></div>
         <div class="dividend-metrics" id="dividendMetrics"></div>
         <table class="dividend-table">
-          <thead><tr><th>Year</th><th>Dividends</th><th>After tax</th><th>% invested</th><th>% ending balance</th></tr></thead>
+          <thead><tr><th id="dividendPeriodHeader">Year</th><th>Dividends</th><th>After tax</th><th>% invested</th><th>% ending balance</th></tr></thead>
           <tbody id="dividendBody"></tbody>
         </table>
       </div>
@@ -594,6 +601,7 @@
 
   let blendMode = "single";
   let volatilityEnabled = false;
+  let periodMode = "years";
 
   let displayMode = "nominal"; // or "real"
   let heroScenario = "B"; // A, B, C
@@ -622,7 +630,7 @@
 
   // ---------- engine ----------
   function computeSeries(p, rangeMode){
-    const months = p.years * 12;
+    const months = p.horizonMonths || p.years * 12;
     const monthlyGrowth = p.mgrowth/100;
     const annualFee = p.fee/100;
     const divTax = p.divtax/100;
@@ -691,7 +699,7 @@
 
   function blendSeries(weights, rangeMode){
     const parts = PRESETS.map((preset, i)=>computeSeries({...state, ...preset, contrib:state.contrib * weights[i]/100, start:state.start * weights[i]/100, years:state.years, stopMonths:state.stopMonths, withdrawal:state.withdrawal * weights[i]/100, withdrawalYear:state.withdrawalYear}, rangeMode));
-    const months = state.years * 12;
+    const months = state.horizonMonths;
     const result = {months:[], A:[], B:[], C:[], Ctotal:[], invested:[], dividends:[], dividendsAfterTax:[], yearDividends:[], yearDividendsAfterTax:[], cashCFinal:0};
     for(let m=0; m<months; m++){
       result.months.push(m+1);
@@ -774,8 +782,11 @@
     state.start = parseFloat($("start").value) || 0;
     state.contrib = parseFloat($("contrib").value) || 0;
     state.step = parseFloat($("step").value) || 0;
-    state.years = parseInt($("years").value) || 1;
-    state.stopMonths = Math.min(parseInt($("stopMonths").value) || state.years*12, state.years*12);
+    const periodValue = parseInt($("years").value) || 1;
+    state.horizonMonths = periodMode === "months" ? periodValue : periodValue * 12;
+    state.years = Math.max(1, Math.ceil(state.horizonMonths / 12));
+    state.stopMonths = Math.min(parseInt($("stopMonths").value) || state.horizonMonths, state.horizonMonths);
+    $("stopMonths").value = state.stopMonths;
     state.mgrowth = parseFloat($("mgrowth").value) || 0;
     state.divyield = parseFloat($("divyield").value) || 0;
     state.divgrowth = parseFloat($("divgrowth").value) || 0;
@@ -785,14 +796,17 @@
     state.currency = $("currency").value;
     state.withdrawal = parseFloat($("withdrawal").value) || 0;
     state.withdrawalYear = parseInt($("withdrawalYear").value) || 1;
+    state.periodMode = periodMode;
     const weights = [0,1,2,3].map(i=>parseInt($("blend"+i).value) || 0);
 
     // update label chips
     $("startVal").textContent = state.currency + state.start.toLocaleString();
     $("contribVal").textContent = state.currency + state.contrib.toLocaleString();
     $("stepVal").textContent = pct(state.step) + "/yr";
-    $("yearsVal").textContent = state.years + (state.years===1 ? " year" : " years");
-    $("stopMonthsVal").textContent = state.stopMonths >= state.years*12 ? "horizon" : state.stopMonths + " mo";
+    $("horizonLabel").textContent = periodMode === "months" ? "Time horizon" : "Time horizon";
+    $("yearsVal").textContent = periodMode === "months" ? state.horizonMonths + (state.horizonMonths===1 ? " month" : " months") : state.years + (state.years===1 ? " year" : " years");
+    $("years").max = periodMode === "months" ? 360 : 30;
+    $("stopMonthsVal").textContent = state.stopMonths >= state.horizonMonths ? "horizon" : state.stopMonths + " mo";
     $("mgrowthVal").textContent = pct(state.mgrowth) + "/mo";
     $("divyieldVal").textContent = pct(state.divyield) + "/yr";
     $("divgrowthVal").textContent = pct(state.divgrowth) + "/yr";
@@ -828,7 +842,14 @@
     const lastAnnualDividend = series.yearDividendsAfterTax[series.yearDividendsAfterTax.length-1] || 0;
     const dividendMetrics = [["Total dividends",fmtMoney(dividendTotal,state.currency)],["After tax",fmtMoney(dividendAfterTax,state.currency)],["Average / month",fmtMoney(dividendAvgMonthly,state.currency)],["Yield on cost",pct(lastAnnualDividend/Math.max(invested,1)*100)]];
     $("dividendMetrics").innerHTML = dividendMetrics.map(([key,value])=>'<div class="cell"><div class="k">'+key+'</div><div class="v">'+value+'</div></div>').join("");
-    $("dividendBody").innerHTML = series.yearDividends.map((value, index)=>{
+    $("dividendPeriodHeader").textContent = periodMode === "months" ? "Month" : "Year";
+    $("dividendBody").innerHTML = periodMode === "months" ? series.months.map((month, index)=>{
+      const afterTax = series.dividendsAfterTax[index] / (displayMode === "real" ? realFactor(state.inflation, index+1) : 1);
+      const gross = series.dividends[index] / (displayMode === "real" ? realFactor(state.inflation, index+1) : 1);
+      const investedAtMonth = series.invested[index] / (displayMode === "real" ? realFactor(state.inflation, index+1) : 1);
+      const endingBalance = series.Ctotal[index] / (displayMode === "real" ? realFactor(state.inflation, index+1) : 1);
+      return `<tr><td>Month ${month}</td><td>${fmtMoney(gross,state.currency)}</td><td>${fmtMoney(afterTax,state.currency)}</td><td>${pct(afterTax/Math.max(investedAtMonth,1)*100)}</td><td>${pct(afterTax/Math.max(endingBalance,1)*100)}</td></tr>`;
+    }) : series.yearDividends.map((value, index)=>{
       const afterTax = (series.yearDividendsAfterTax[index] || 0) / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
       const gross = value / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
       const investedAtYear = series.invested[Math.min((index+1)*12,months)-1] / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
@@ -839,7 +860,7 @@
     // hero
     const heroValues = { A: finalA, B: finalB, C: finalCtotal };
     const heroLabels = { A:"no dividends", B:"dividends reinvested", C:"dividends paid as cash" };
-    $("heroHorizon").textContent = "month " + months + " (" + state.years + (state.years===1?" yr":" yrs") + ")";
+    $("heroHorizon").textContent = periodMode === "months" ? "month " + months : state.years + (state.years===1 ? " year" : " years") + " (" + months + " months)";
     $("heroScenarioLabel").textContent = heroLabels[heroScenario];
     $("heroNumber").textContent = fmtMoney(heroValues[heroScenario], state.currency);
     const realAtHero = displayMode === "real" ? heroValues[heroScenario] : heroValues[heroScenario] / realFactor(state.inflation, months);
@@ -908,6 +929,7 @@
     $("contrib").value = p.contrib;
     $("step").value = p.step;
     $("years").value = p.years;
+    if(periodMode === "months") $("years").value = p.years * 12;
     $("stopMonths").value = p.years * 12;
     $("mgrowth").value = p.mgrowth;
     $("divyield").value = p.divyield;
@@ -946,6 +968,19 @@
       render();
     });
 
+    $("periodToggle").addEventListener("click", (e)=>{
+      const btn = e.target.closest("button");
+      if(!btn || btn.dataset.mode === periodMode) return;
+      if(btn.dataset.mode === "months"){
+        $("years").value = Math.min(360, (parseInt($("years").value) || 1) * 12);
+      }else{
+        $("years").value = Math.max(1, Math.ceil((parseInt($("years").value) || 1) / 12));
+      }
+      periodMode = btn.dataset.mode;
+      [...$("periodToggle").children].forEach(b=>b.classList.toggle("active", b===btn));
+      render();
+    });
+
     $("volatilityToggle").addEventListener("click", (e)=>{
       const btn = e.target.closest("button");
       if(!btn) return;
@@ -981,6 +1016,7 @@
         if(saved.contrib!==undefined) $("contrib").value = saved.contrib;
         if(saved.step!==undefined) $("step").value = saved.step;
         if(saved.years!==undefined) $("years").value = saved.years;
+        if(saved.periodMode!==undefined) periodMode = saved.periodMode;
         if(saved.stopMonths!==undefined) $("stopMonths").value = saved.stopMonths;
         if(saved.mgrowth!==undefined) $("mgrowth").value = saved.mgrowth;
         if(saved.divyield!==undefined) $("divyield").value = saved.divyield;
@@ -995,6 +1031,10 @@
     } else {
       // default to first preset for a friendlier first run
       applyPreset(PRESETS[0]);
+    }
+    if(periodMode === "months"){
+      $("years").value = Math.min(360, (parseInt($("years").value) || 1) * 12);
+      [...$("periodToggle").children].forEach(b=>b.classList.toggle("active", b.dataset.mode === "months"));
     }
     render();
   }
