@@ -215,6 +215,11 @@
     background:var(--green);
     color:var(--panel);
   }
+  .blend-grid{display:none; border-top:1px solid var(--line); margin-top:10px; padding-top:10px;}
+  .blend-grid.visible{display:block;}
+  .blend-row{display:grid; grid-template-columns:1fr 78px; gap:8px; align-items:center; margin-bottom:7px;}
+  .blend-row label{font-size:12px;}
+  .blend-row input{width:100%;}
 
   /* ---------- Results (right) ---------- */
   .results{min-width:0;}
@@ -365,6 +370,18 @@
     font-size:20px;
     font-weight:600;
   }
+  .dividend-panel{border:1px solid var(--line); background:var(--panel); padding:16px; margin-bottom:22px;}
+  .panel-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px;}
+  .panel-head h2{font-size:15px; margin:0; font-weight:600;}
+  .panel-note{font-size:11px; color:var(--ink-soft);}
+  .dividend-metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-bottom:14px;}
+  .dividend-metrics .cell{background:var(--panel); padding:11px 12px;}
+  .dividend-metrics .k{font-size:10.5px; color:var(--ink-soft); margin-bottom:3px;}
+  .dividend-metrics .v{font:600 17px 'IBM Plex Mono', monospace;}
+  table.dividend-table{width:100%; border-collapse:collapse; font-size:12px;}
+  table.dividend-table th, table.dividend-table td{padding:6px 7px; text-align:right; border-bottom:1px solid var(--line); font-family:'IBM Plex Mono', monospace;}
+  table.dividend-table th:first-child, table.dividend-table td:first-child{text-align:left; font-family:'Source Serif 4', serif;}
+  @media (max-width:640px){.dividend-metrics{grid-template-columns:repeat(2,1fr);}}
 </style>
 </head>
 <body>
@@ -400,6 +417,11 @@
         <div class="field">
           <label for="years">Time horizon <span class="val" id="yearsVal"></span></label>
           <input type="range" id="years" min="1" max="30" step="1" value="1">
+        </div>
+        <div class="field">
+          <label for="stopMonths">Stop contributions after <span class="val" id="stopMonthsVal"></span></label>
+          <input type="range" id="stopMonths" min="1" max="360" step="1" value="12">
+          <div class="hint">Set below the horizon to let the balance compound without new deposits.</div>
         </div>
       </fieldset>
 
@@ -449,6 +471,38 @@
         </div>
       </fieldset>
 
+      <fieldset>
+        <legend>Portfolio mode</legend>
+        <div class="toggle-row" id="blendToggle">
+          <button data-mode="single" class="active">Single asset</button>
+          <button data-mode="blend">Portfolio blend</button>
+        </div>
+        <div class="blend-grid" id="blendGrid">
+          <div class="hint">Contribution split. Each asset uses its preset assumptions; adjust any share.</div>
+          <div class="blend-row"><label for="blend0">S&amp;P 500 avg <span class="val" id="blend0Val"></span></label><input type="range" id="blend0" min="0" max="100" step="5" value="40"></div>
+          <div class="blend-row"><label for="blend1">Bond fund <span class="val" id="blend1Val"></span></label><input type="range" id="blend1" min="0" max="100" step="5" value="20"></div>
+          <div class="blend-row"><label for="blend2">High-growth stock <span class="val" id="blend2Val"></span></label><input type="range" id="blend2" min="0" max="100" step="5" value="20"></div>
+          <div class="blend-row"><label for="blend3">High-yield dividend <span class="val" id="blend3Val"></span></label><input type="range" id="blend3" min="0" max="100" step="5" value="20"></div>
+          <div class="hint" id="blendTotal"></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Optional stress tests</legend>
+        <div class="field">
+          <label>Year-to-year volatility</label>
+          <div class="toggle-row" id="volatilityToggle"><button data-enabled="false" class="active">Smooth</button><button data-enabled="true">±25% range</button></div>
+        </div>
+        <div class="field">
+          <label for="withdrawal">Monthly withdrawal <span class="val" id="withdrawalVal"></span></label>
+          <input type="number" id="withdrawal" min="0" step="50" value="0">
+        </div>
+        <div class="field">
+          <label for="withdrawalYear">Withdraw starting year <span class="val" id="withdrawalYearVal"></span></label>
+          <input type="range" id="withdrawalYear" min="1" max="30" step="1" value="1">
+        </div>
+      </fieldset>
+
       <div class="field" style="margin-top:14px;">
         <label>Currency label</label>
         <select id="currency">
@@ -483,6 +537,15 @@
 
       <div class="composition" id="composition"></div>
 
+      <div class="dividend-panel">
+        <div class="panel-head"><h2>Dividend income</h2><span class="panel-note">Dividend, cash scenario after tax</span></div>
+        <div class="dividend-metrics" id="dividendMetrics"></div>
+        <table class="dividend-table">
+          <thead><tr><th>Year</th><th>Dividends</th><th>After tax</th><th>% invested</th><th>% ending balance</th></tr></thead>
+          <tbody id="dividendBody"></tbody>
+        </table>
+      </div>
+
       <table class="ledger">
         <caption>All three scenarios at your chosen horizon</caption>
         <thead>
@@ -505,8 +568,8 @@
       </div>
 
       <div class="footnote">
-        <p><strong>What's modeled:</strong> monthly contributions (increased once a year if you set a raise), constant monthly price growth, a dividend yield paid monthly and optionally reinvested, dividend tax, an annual fee drag, and inflation to translate the result into today's purchasing power.</p>
-        <p><strong>What isn't:</strong> real markets don't move in a straight line — an average of 1%/month is not the same as gaining exactly 1% every single month. Capital gains tax on selling, transaction costs, and dividend cuts aren't modeled either. This is a planning sketch, not a forecast or investment advice.</p>
+        <p><strong>What's modeled:</strong> monthly contributions until the selected stop date, annual contribution raises, smooth or illustrative year-to-year growth ranges, dividends paid monthly with optional reinvestment, dividend tax, annual fees, inflation, blended asset weights, and optional monthly withdrawals.</p>
+        <p><strong>What isn't:</strong> the volatility range is a deterministic ±25% stress illustration, not a forecast or probability model. Asset correlations, market timing, capital-gains tax on selling, transaction costs, sequence-of-returns risk, and dividend cuts are not modeled. This remains a planning sketch, not investment advice.</p>
       </div>
 
     </div>
@@ -519,15 +582,18 @@
 
   const $ = id => document.getElementById(id);
 
-  const ids = ["start","contrib","step","years","mgrowth","divyield","divgrowth","fee","divtax","inflation","currency"];
+  const ids = ["start","contrib","step","years","stopMonths","mgrowth","divyield","divgrowth","fee","divtax","inflation","currency","withdrawal","withdrawalYear"];
   const state = {};
 
   const PRESETS = [
-    {name:"S&P 500 avg", start:0, contrib:1000, step:0, years:20, mgrowth:0.84, divyield:1.8, divgrowth:2, fee:0.05, divtax:15, inflation:3},
-    {name:"Bond fund", start:0, contrib:1000, step:0, years:20, mgrowth:0.25, divyield:3.5, divgrowth:0, fee:0.1, divtax:22, inflation:3},
-    {name:"High-growth stock", start:0, contrib:1000, step:0, years:10, mgrowth:1.6, divyield:0, divgrowth:0, fee:0, divtax:15, inflation:3},
-    {name:"High-yield dividend", start:0, contrib:1000, step:0, years:15, mgrowth:0.35, divyield:7, divgrowth:1, fee:0.1, divtax:15, inflation:3},
+    {name:"S&P 500 avg", start:0, contrib:1000, step:0, years:20, mgrowth:0.64, divyield:1.4, divgrowth:4, fee:0.05, divtax:15, inflation:3},
+    {name:"Bond fund", start:0, contrib:1000, step:0, years:20, mgrowth:0.08, divyield:4, divgrowth:0, fee:0.1, divtax:22, inflation:3},
+    {name:"High-growth stock", start:0, contrib:1000, step:0, years:10, mgrowth:1.35, divyield:0, divgrowth:0, fee:0, divtax:15, inflation:3},
+    {name:"High-yield dividend", start:0, contrib:1000, step:0, years:15, mgrowth:0.33, divyield:6, divgrowth:2, fee:0.1, divtax:15, inflation:3},
   ];
+
+  let blendMode = "single";
+  let volatilityEnabled = false;
 
   let displayMode = "nominal"; // or "real"
   let heroScenario = "B"; // A, B, C
@@ -555,7 +621,7 @@
   function pct(v){ return v.toFixed(2) + "%"; }
 
   // ---------- engine ----------
-  function computeSeries(p){
+  function computeSeries(p, rangeMode){
     const months = p.years * 12;
     const monthlyGrowth = p.mgrowth/100;
     const annualFee = p.fee/100;
@@ -565,12 +631,14 @@
     const contribStep = p.step/100;
 
     let A = p.start, B = p.start, C = p.start, cashC = 0, invested = p.start;
-    const series = { months:[], A:[], B:[], C:[], Ctotal:[], invested:[] };
+    const series = { months:[], A:[], B:[], C:[], Ctotal:[], invested:[], dividends:[], dividendsAfterTax:[], yearDividends:[], yearDividendsAfterTax:[] };
+    let yearDividends = 0, yearDividendsAfterTax = 0;
 
     for(let m=1; m<=months; m++){
       const yearIdx = Math.floor((m-1)/12);
-      const contribution = p.contrib * Math.pow(1+contribStep, yearIdx);
-      const effGrowth = monthlyGrowth - annualFee/12;
+      const contribution = m <= Math.min(months, p.stopMonths || months) ? p.contrib * Math.pow(1+contribStep, yearIdx) : 0;
+      const rangeFactor = rangeMode === "low" ? 0.75 : rangeMode === "high" ? 1.25 : 1;
+      const effGrowth = monthlyGrowth * rangeFactor - annualFee/12;
       const divYieldMonthly = baseDivYieldMonthly * Math.pow(1+divGrowthAnnual, yearIdx);
 
       // Scenario A: no dividend
@@ -590,6 +658,15 @@
       let divC = afterC * divYieldMonthly * (1-divTax);
       C = afterC + growC;
       cashC += divC;
+      yearDividends += divC / Math.max(1-divTax, 0.0001);
+      yearDividendsAfterTax += divC;
+
+      if(p.withdrawal > 0 && m >= (p.withdrawalYear || 1) * 12){
+        const draw = p.withdrawal;
+        A = Math.max(0, A - draw);
+        B = Math.max(0, B - draw);
+        C = Math.max(0, C - draw);
+      }
 
       invested += contribution;
 
@@ -599,9 +676,31 @@
       series.C.push(C);
       series.Ctotal.push(C + cashC);
       series.invested.push(invested);
+      series.dividends.push(divC / Math.max(1-divTax, 0.0001));
+      series.dividendsAfterTax.push(divC);
+      if(m % 12 === 0 || m === months){
+        series.yearDividends.push(yearDividends);
+        series.yearDividendsAfterTax.push(yearDividendsAfterTax);
+        yearDividends = 0;
+        yearDividendsAfterTax = 0;
+      }
     }
     series.cashCFinal = cashC;
     return series;
+  }
+
+  function blendSeries(weights, rangeMode){
+    const parts = PRESETS.map((preset, i)=>computeSeries({...state, ...preset, contrib:state.contrib * weights[i]/100, start:state.start * weights[i]/100, years:state.years, stopMonths:state.stopMonths, withdrawal:state.withdrawal * weights[i]/100, withdrawalYear:state.withdrawalYear}, rangeMode));
+    const months = state.years * 12;
+    const result = {months:[], A:[], B:[], C:[], Ctotal:[], invested:[], dividends:[], dividendsAfterTax:[], yearDividends:[], yearDividendsAfterTax:[], cashCFinal:0};
+    for(let m=0; m<months; m++){
+      result.months.push(m+1);
+      ["A","B","C","Ctotal","invested","dividends","dividendsAfterTax"].forEach(key=>result[key].push(parts.reduce((sum, part)=>sum+(part[key][m]||0),0)));
+    }
+    result.cashCFinal = parts.reduce((sum, part)=>sum + part.cashCFinal, 0);
+    result.yearDividends = parts[0].yearDividends.map((_, year)=>parts.reduce((sum, part)=>sum+(part.yearDividends[year]||0),0));
+    result.yearDividendsAfterTax = parts[0].yearDividendsAfterTax.map((_, year)=>parts.reduce((sum, part)=>sum+(part.yearDividendsAfterTax[year]||0),0));
+    return result;
   }
 
   function realFactor(inflationPct, months){
@@ -625,7 +724,26 @@
         { label:"No dividend", data:[], borderColor:cssVar('--ink-soft'), backgroundColor:"transparent", borderWidth:2, pointRadius:0, tension:0.15 },
         { label:"Dividend, cash", data:[], borderColor:cssVar('--gold'), backgroundColor:"transparent", borderWidth:2, pointRadius:0, tension:0.15 },
         { label:"Dividend, reinvested", data:[], borderColor:cssVar('--green'), backgroundColor:"transparent", borderWidth:2.5, pointRadius:0, tension:0.15 },
+        { label:"Volatility low", data:[], borderColor:"transparent", backgroundColor:"transparent", borderWidth:1, pointRadius:0, tension:0.15 },
+        { label:"Volatility high", data:[], borderColor:cssVar('--brick'), backgroundColor:cssVar('--brick') + "22", borderWidth:1, pointRadius:0, tension:0.15, fill:"-1", hidden:true },
       ]},
+      plugins: [{
+        id:"contributionStop",
+        afterDraw: function(instance){
+          const stop = Math.min(state.stopMonths || instance.data.labels.length, instance.data.labels.length);
+          if(!stop || !instance.scales.x) return;
+          const x = instance.scales.x.getPixelForValue(stop - 1);
+          const {top,bottom,left,right} = instance.chartArea;
+          const ctx = instance.ctx;
+          ctx.save();
+          ctx.fillStyle = cssVar('--gold') + "12";
+          ctx.fillRect(x, top, right-x, bottom-top);
+          ctx.strokeStyle = cssVar('--gold');
+          ctx.setLineDash([4,4]);
+          ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+          ctx.restore();
+        }
+      }],
       options: {
         responsive:true, maintainAspectRatio:false,
         interaction:{ mode:"index", intersect:false },
@@ -657,6 +775,7 @@
     state.contrib = parseFloat($("contrib").value) || 0;
     state.step = parseFloat($("step").value) || 0;
     state.years = parseInt($("years").value) || 1;
+    state.stopMonths = Math.min(parseInt($("stopMonths").value) || state.years*12, state.years*12);
     state.mgrowth = parseFloat($("mgrowth").value) || 0;
     state.divyield = parseFloat($("divyield").value) || 0;
     state.divgrowth = parseFloat($("divgrowth").value) || 0;
@@ -664,23 +783,34 @@
     state.divtax = parseFloat($("divtax").value) || 0;
     state.inflation = parseFloat($("inflation").value) || 0;
     state.currency = $("currency").value;
+    state.withdrawal = parseFloat($("withdrawal").value) || 0;
+    state.withdrawalYear = parseInt($("withdrawalYear").value) || 1;
+    const weights = [0,1,2,3].map(i=>parseInt($("blend"+i).value) || 0);
 
     // update label chips
     $("startVal").textContent = state.currency + state.start.toLocaleString();
     $("contribVal").textContent = state.currency + state.contrib.toLocaleString();
     $("stepVal").textContent = pct(state.step) + "/yr";
     $("yearsVal").textContent = state.years + (state.years===1 ? " year" : " years");
+    $("stopMonthsVal").textContent = state.stopMonths >= state.years*12 ? "horizon" : state.stopMonths + " mo";
     $("mgrowthVal").textContent = pct(state.mgrowth) + "/mo";
     $("divyieldVal").textContent = pct(state.divyield) + "/yr";
     $("divgrowthVal").textContent = pct(state.divgrowth) + "/yr";
     $("feeVal").textContent = pct(state.fee) + "/yr";
     $("divtaxVal").textContent = pct(state.divtax);
     $("inflationVal").textContent = pct(state.inflation) + "/yr";
+    $("withdrawalVal").textContent = fmtMoney(state.withdrawal, state.currency) + "/mo";
+    $("withdrawalYearVal").textContent = "year " + state.withdrawalYear;
+    weights.forEach((weight,i)=>$("blend"+i+"Val").textContent = weight + "%");
+    const weightTotal = weights.reduce((sum, weight)=>sum+weight,0);
+    $("blendTotal").textContent = weightTotal === 100 ? "100% allocated" : weightTotal + "% allocated — adjust weights to total 100%";
 
     const annualEquiv = (Math.pow(1+state.mgrowth/100,12)-1)*100;
     $("annualEquiv").textContent = "≈ " + annualEquiv.toFixed(1) + "% annualized, if it held every month";
 
-    const series = computeSeries(state);
+    const series = blendMode === "blend" ? blendSeries(weights) : computeSeries(state);
+    const lowSeries = volatilityEnabled ? (blendMode === "blend" ? blendSeries(weights,"low") : computeSeries(state,"low")) : null;
+    const highSeries = volatilityEnabled ? (blendMode === "blend" ? blendSeries(weights,"high") : computeSeries(state,"high")) : null;
     const months = series.months.length;
     const rf = displayMode === "real" ? realFactor(state.inflation, months) : 1;
 
@@ -690,6 +820,21 @@
     const finalCPortfolio = series.C[months-1] / rf;
     const finalCash = series.cashCFinal / rf;
     const invested = series.invested[months-1] / rf;
+
+    const dividendTotal = series.dividends.reduce((sum, value)=>sum+value,0) / rf;
+    const dividendAfterTax = series.dividendsAfterTax.reduce((sum, value)=>sum+value,0) / rf;
+    const dividendAvgMonthly = dividendAfterTax / Math.max(months,1);
+    const dividendAvgAnnual = dividendAfterTax / Math.max(state.years,1);
+    const lastAnnualDividend = series.yearDividendsAfterTax[series.yearDividendsAfterTax.length-1] || 0;
+    const dividendMetrics = [["Total dividends",fmtMoney(dividendTotal,state.currency)],["After tax",fmtMoney(dividendAfterTax,state.currency)],["Average / month",fmtMoney(dividendAvgMonthly,state.currency)],["Yield on cost",pct(lastAnnualDividend/Math.max(invested,1)*100)]];
+    $("dividendMetrics").innerHTML = dividendMetrics.map(([key,value])=>'<div class="cell"><div class="k">'+key+'</div><div class="v">'+value+'</div></div>').join("");
+    $("dividendBody").innerHTML = series.yearDividends.map((value, index)=>{
+      const afterTax = (series.yearDividendsAfterTax[index] || 0) / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
+      const gross = value / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
+      const investedAtYear = series.invested[Math.min((index+1)*12,months)-1] / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
+      const endingBalance = series.Ctotal[Math.min((index+1)*12,months)-1] / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
+      return `<tr><td>Year ${index+1}</td><td>${fmtMoney(gross,state.currency)}</td><td>${fmtMoney(afterTax,state.currency)}</td><td>${pct(afterTax/Math.max(investedAtYear,1)*100)}</td><td>${pct(afterTax/Math.max(endingBalance,1)*100)}</td></tr>`;
+    }).join("");
 
     // hero
     const heroValues = { A: finalA, B: finalB, C: finalCtotal };
@@ -744,6 +889,10 @@
     c.data.datasets[0].data = series.A.map((v,i)=> v / (displayMode==="real" ? realFactor(state.inflation, i+1) : 1));
     c.data.datasets[1].data = series.Ctotal.map((v,i)=> v / (displayMode==="real" ? realFactor(state.inflation, i+1) : 1));
     c.data.datasets[2].data = series.B.map((v,i)=> v / (displayMode==="real" ? realFactor(state.inflation, i+1) : 1));
+    c.data.datasets[3].data = lowSeries ? lowSeries.B.map((v,i)=> v / (displayMode==="real" ? realFactor(state.inflation, i+1) : 1)) : [];
+    c.data.datasets[4].data = highSeries ? highSeries.B.map((v,i)=> v / (displayMode==="real" ? realFactor(state.inflation, i+1) : 1)) : [];
+    c.data.datasets[3].hidden = !volatilityEnabled;
+    c.data.datasets[4].hidden = !volatilityEnabled;
     c.options.scales.x.ticks.callback = function(val, idx){
       const m = series.months[idx];
       if(m===undefined) return "";
@@ -759,12 +908,15 @@
     $("contrib").value = p.contrib;
     $("step").value = p.step;
     $("years").value = p.years;
+    $("stopMonths").value = p.years * 12;
     $("mgrowth").value = p.mgrowth;
     $("divyield").value = p.divyield;
     $("divgrowth").value = p.divgrowth;
     $("fee").value = p.fee;
     $("divtax").value = p.divtax;
     $("inflation").value = p.inflation;
+    $("withdrawal").value = 0;
+    $("withdrawalYear").value = 1;
     render();
   }
 
@@ -780,9 +932,26 @@
   }
 
   function wireInputs(){
-    ["start","contrib","step","years","mgrowth","divyield","divgrowth","fee","divtax","inflation","currency"].forEach(id=>{
+    ids.concat(["blend0","blend1","blend2","blend3"]).forEach(id=>{
       $(id).addEventListener("input", render);
       $(id).addEventListener("change", render);
+    });
+
+    $("blendToggle").addEventListener("click", (e)=>{
+      const btn = e.target.closest("button");
+      if(!btn) return;
+      blendMode = btn.dataset.mode;
+      $("blendGrid").classList.toggle("visible", blendMode === "blend");
+      [...$("blendToggle").children].forEach(b=>b.classList.toggle("active", b===btn));
+      render();
+    });
+
+    $("volatilityToggle").addEventListener("click", (e)=>{
+      const btn = e.target.closest("button");
+      if(!btn) return;
+      volatilityEnabled = btn.dataset.enabled === "true";
+      [...$("volatilityToggle").children].forEach(b=>b.classList.toggle("active", b===btn));
+      render();
     });
 
     $("realToggle").addEventListener("click", (e)=>{
@@ -812,6 +981,7 @@
         if(saved.contrib!==undefined) $("contrib").value = saved.contrib;
         if(saved.step!==undefined) $("step").value = saved.step;
         if(saved.years!==undefined) $("years").value = saved.years;
+        if(saved.stopMonths!==undefined) $("stopMonths").value = saved.stopMonths;
         if(saved.mgrowth!==undefined) $("mgrowth").value = saved.mgrowth;
         if(saved.divyield!==undefined) $("divyield").value = saved.divyield;
         if(saved.divgrowth!==undefined) $("divgrowth").value = saved.divgrowth;
@@ -819,6 +989,8 @@
         if(saved.divtax!==undefined) $("divtax").value = saved.divtax;
         if(saved.inflation!==undefined) $("inflation").value = saved.inflation;
         if(saved.currency!==undefined) $("currency").value = saved.currency;
+        if(saved.withdrawal!==undefined) $("withdrawal").value = saved.withdrawal;
+        if(saved.withdrawalYear!==undefined) $("withdrawalYear").value = saved.withdrawalYear;
       }catch(e){ /* ignore malformed save */ }
     } else {
       // default to first preset for a friendlier first run
