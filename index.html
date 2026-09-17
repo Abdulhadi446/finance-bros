@@ -6,8 +6,9 @@
 <title>Compound Ledger — Investment Scenario Calculator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<style>
+<style media="not all">
   :root{
     --paper:#E9E6DC;
     --paper-2:#E1DDCF;
@@ -578,6 +579,21 @@
         <p><strong>What's modeled:</strong> monthly contributions until the selected stop date, annual contribution raises, smooth or illustrative year-to-year growth ranges, dividends paid monthly with optional reinvestment, dividend tax, annual fees, inflation, blended asset weights, and optional monthly withdrawals.</p>
         <p><strong>What isn't:</strong> the volatility range is a deterministic ±25% stress illustration, not a forecast or probability model. Asset correlations, market timing, capital-gains tax on selling, transaction costs, sequence-of-returns risk, and dividend cuts are not modeled. This remains a planning sketch, not investment advice.</p>
       </div>
+
+      <section class="help" id="help">
+        <h2>Quick guide &amp; FAQs</h2>
+        <div class="faq-grid">
+          <article class="faq"><h3>How do I run a monthly calculation?</h3><p>Select <strong>Months</strong> under Calculate by. The horizon, chart, stop date, and dividend table will all use monthly periods.</p></article>
+          <article class="faq"><h3>What does “stop contributions” do?</h3><p>It stops new deposits after the selected month. Existing money continues to grow, receive dividends, and follow withdrawals for the rest of the horizon.</p></article>
+          <article class="faq"><h3>What is the difference between dividend cash and reinvested?</h3><p>Dividend, cash leaves after-tax dividends outside the invested balance. Dividend, reinvested adds after-tax dividends back into the balance.</p></article>
+          <article class="faq"><h3>How should I use Portfolio blend?</h3><p>Choose the blend mode, set each contribution share, and make the total equal 100%. Each preset keeps its own growth, yield, fee, and tax assumptions.</p></article>
+          <article class="faq"><h3>What does the volatility range mean?</h3><p>It shows illustrative low and high paths using 75% and 125% of the average monthly growth. It is a stress range, not a prediction or probability estimate.</p></article>
+          <article class="faq"><h3>Are the preset returns guaranteed?</h3><p>No. Presets are editable planning assumptions based on broad historical-style examples. They do not forecast any security or account.</p></article>
+          <article class="faq"><h3>How are taxes and inflation handled?</h3><p>Dividend tax reduces dividend cash and reinvestment. The Today’s $ view discounts nominal values using the annual inflation assumption.</p></article>
+          <article class="faq"><h3>What should I check before relying on a result?</h3><p>Try lower and higher growth, change the contribution stop date, compare cash versus reinvested dividends, and test a withdrawal amount. Treat the output as a scenario sketch.</p></article>
+        </div>
+        <p class="footnote">For the full model description and examples, read <a href="README.md">the project guide</a>.</p>
+      </section>
 
     </div>
   </div>
