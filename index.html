@@ -843,7 +843,7 @@
     const dividendMetrics = [["Total dividends",fmtMoney(dividendTotal,state.currency)],["After tax",fmtMoney(dividendAfterTax,state.currency)],["Average / month",fmtMoney(dividendAvgMonthly,state.currency)],["Yield on cost",pct(lastAnnualDividend/Math.max(invested,1)*100)]];
     $("dividendMetrics").innerHTML = dividendMetrics.map(([key,value])=>'<div class="cell"><div class="k">'+key+'</div><div class="v">'+value+'</div></div>').join("");
     $("dividendPeriodHeader").textContent = periodMode === "months" ? "Month" : "Year";
-    $("dividendBody").innerHTML = periodMode === "months" ? series.months.map((month, index)=>{
+    const dividendRows = periodMode === "months" ? series.months.map((month, index)=>{
       const afterTax = series.dividendsAfterTax[index] / (displayMode === "real" ? realFactor(state.inflation, index+1) : 1);
       const gross = series.dividends[index] / (displayMode === "real" ? realFactor(state.inflation, index+1) : 1);
       const investedAtMonth = series.invested[index] / (displayMode === "real" ? realFactor(state.inflation, index+1) : 1);
@@ -855,7 +855,8 @@
       const investedAtYear = series.invested[Math.min((index+1)*12,months)-1] / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
       const endingBalance = series.Ctotal[Math.min((index+1)*12,months)-1] / (displayMode === "real" ? realFactor(state.inflation, Math.min((index+1)*12,months)) : 1);
       return `<tr><td>Year ${index+1}</td><td>${fmtMoney(gross,state.currency)}</td><td>${fmtMoney(afterTax,state.currency)}</td><td>${pct(afterTax/Math.max(investedAtYear,1)*100)}</td><td>${pct(afterTax/Math.max(endingBalance,1)*100)}</td></tr>`;
-    }).join("");
+    });
+    $("dividendBody").innerHTML = dividendRows.join("");
 
     // hero
     const heroValues = { A: finalA, B: finalB, C: finalCtotal };
